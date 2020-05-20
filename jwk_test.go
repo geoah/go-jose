@@ -27,7 +27,9 @@ import (
 	"crypto/sha256"
 	"crypto/x509"
 	"encoding/hex"
+	"fmt"
 	"math/big"
+	"net/url"
 	"reflect"
 	"strings"
 	"testing"
@@ -1109,5 +1111,51 @@ func TestJWKPaddingY(t *testing.T) {
 	}
 	if jwk.Valid() {
 		t.Errorf("Expected key to be invalid, but it was valid.")
+	}
+}
+
+func TestJWKX5uMarshalling(t *testing.T) {
+	jwk := JSONWebKey{
+		Key:       testCertificates[0].PublicKey,
+		KeyID:     "bar",
+		Algorithm: "foo",
+		CertificatesURL: &url.URL{
+			Host:   "localhost:8080",
+			Scheme: "http",
+			Path:   "/foo",
+		},
+	}
+	body, err := jwk.MarshalJSON()
+	if err != nil {
+		t.Fatalf("Expected to be able to marshal the key, got %q", err)
+	}
+	expKey := `{"kty":"RSA","kid":"bar","alg":"foo","n":"u7LUr30Mhrh8N79-H4rKiHQ123q6xaBZPYbf1nV4GM19rizSnbEfyebG1kpfCv-XY6c499XiM6lOvcPL-0goTOcfW6Lg7AAR895GbnMeXEmnxICaI8rAZHK6t1WPmiWp82y_qhK2F_pYUaT3GSuiTFiMGq_GNwdpWuMlsInnnMNv1nxFbxtDPwzmCp0fEBxbH5d1EtXZwTPOHMyj8rfa-NIA5Nl4h_5RrbOWveKwBr26_CDAratJgOWh9xcd5g0ot_uDGcMoAgB6xeTuYklfaxCPptvu49kvoxw1J71fp6nKW_ZuhDRAp2F_BQ9inKpTo05sPLJg8tPTdjaeouOuJQ","e":"AQAB","x5u":"http://localhost:8080/foo"}`
+	if expKey != string(body) {
+		fmt.Println(string(body))
+		t.Fatalf("Expected to the marshalled body to match expected.")
+	}
+}
+
+func TestJWKX5uUnmarshalling(t *testing.T) {
+	key := `{
+    "kty":"RSA",
+    "kid":"bar",
+    "alg":"foo",
+    "n":"u7LUr30Mhrh8N79-H4rKiHQ123q6xaBZPYbf1nV4GM19rizSnbEfyebG1kpfCv-XY6c499XiM6lOvcPL-0goTOcfW6Lg7AAR895GbnMeXEmnxICaI8rAZHK6t1WPmiWp82y_qhK2F_pYUaT3GSuiTFiMGq_GNwdpWuMlsInnnMNv1nxFbxtDPwzmCp0fEBxbH5d1EtXZwTPOHMyj8rfa-NIA5Nl4h_5RrbOWveKwBr26_CDAratJgOWh9xcd5g0ot_uDGcMoAgB6xeTuYklfaxCPptvu49kvoxw1J71fp6nKW_ZuhDRAp2F_BQ9inKpTo05sPLJg8tPTdjaeouOuJQ",
+    "e":"AQAB",
+    "x5u":"http://localhost:8080/foo"
+  }`
+	var jwk JSONWebKey
+	if err := jwk.UnmarshalJSON([]byte(key)); err != nil {
+		t.Fatalf("Expected to be able to unmarshal the key, got %q", err)
+	}
+	if !jwk.Valid() {
+		t.Errorf("Expected key to be valid, but it was invalid.")
+	}
+	if jwk.CertificatesURL == nil {
+		t.Errorf("Expected CertificatesURL to not be nil.")
+	}
+	if jwk.CertificatesURL.String() != "http://localhost:8080/foo" {
+		t.Errorf("Expected parsed URL to match.")
 	}
 }
